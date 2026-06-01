@@ -13,8 +13,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'andi@example.com'); // default dummy
-  final _passwordController = TextEditingController(text: 'password');
+  final _emailController = TextEditingController(); 
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -30,27 +30,40 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email dan Password harus diisi!')),
+        const SnackBar(content: Text('Email dan Password harus diisi, bosku!')),
       );
       return;
     }
 
     setState(() => _isLoading = true);
-    final auth = context.read<AuthProvider>();
-    final success = await auth.login(email, password);
-    
-    if (!mounted) return;
-    setState(() => _isLoading = false);
 
-    if (success && auth.currentUser != null) {
-      if (auth.currentUser!.role == UserRole.kurir) {
-        Navigator.pushReplacementNamed(context, '/courier_home');
+    try {
+      // Tembak fungsi login di AuthProvider
+      final auth = context.read<AuthProvider>();
+      final success = await auth.login(email, password);
+      
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (success && auth.currentUser != null) {
+        // Cek Hak Akses / Role untuk pengalihan halaman secara real-time
+        if (auth.currentUser!.role == UserRole.kurir) {
+          print("Koneksi API Sukses: Masuk sebagai Kurir");
+          Navigator.pushReplacementNamed(context, '/courier_home');
+        } else {
+          print("Koneksi API Sukses: Masuk sebagai Pelanggan");
+          Navigator.pushReplacementNamed(context, '/customer_home');
+        }
       } else {
-        Navigator.pushReplacementNamed(context, '/customer_home');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login Gagal! Email atau password salah.')),
+        );
       }
-    } else {
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login Gagal. Cek email dan password!')),
+        SnackBar(content: Text('Gagal terhubung ke Backend! Hubungkan HP ke Wifi yang sama dengan laptop. (Error: $e)')),
       );
     }
   }
@@ -99,6 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 28),
                       TextField(
                         controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           hintText: 'Email',
                           prefixIcon: const Icon(Icons.email_outlined),
@@ -131,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           const Text('Belum punya akun?', style: TextStyle(color: Colors.black54)),
                           GestureDetector(
-                            onTap: () {}, // TODO: Forgot Password
+                            onTap: () {}, 
                             child: Text(
                               'Lupa password?',
                               style: TextStyle(
@@ -158,6 +172,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _isLoading ? null : _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2DAAC8),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         ),
                         child: _isLoading
                             ? const SizedBox(
@@ -165,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 width: 20,
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                               )
-                            : const Text('Log In'),
+                            : const Text('Log In', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                       ),
                     ],
                   ),

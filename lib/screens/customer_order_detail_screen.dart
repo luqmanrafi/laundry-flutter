@@ -119,12 +119,9 @@ class CustomerOrderDetailScreen extends StatelessWidget {
                   return ValueListenableBuilder(
                     valueListenable: OrderFlowController.currentTotal,
                     builder: (context, total, child) {
-                      final hasInvoice = status.index >= OrderStatus.waitingConfirmation.index;
+                      final hasInvoice = status.index >= OrderStatus.sedang_dicuci.index;
                       final priceLabel = hasInvoice ? 'Total Tagihan' : 'Estimasi Harga';
                       
-                      // Using NumberFormat would be better, but we'll manually format for simplicity here if needed, 
-                      // or just use intl if it's imported. Wait, I should just use intl or a simple replace.
-                      // Actually, let's just do a simple String.
                       final formatter = total > 0 
                           ? 'Rp ${total.toInt().toString().replaceAll(RegExp(r"\\B(?=(\\d{3})+(?!\\d))"), ".")}' 
                           : 'Rp 20.000 / Kg';
@@ -155,8 +152,8 @@ class CustomerOrderDetailScreen extends StatelessWidget {
                                 ),
                                 onPressed: canAct
                                     ? () async {
-                                        // If it's a payment action, show the gateway first
-                                        if (status.index == OrderStatus.waitingConfirmation.index) {
+                                        
+                                        if (status.index == OrderStatus.sedang_dicuci.index) {
                                           final success = await showModalBottomSheet<bool>(
                                             context: context,
                                             isScrollControlled: true,
@@ -168,7 +165,7 @@ class CustomerOrderDetailScreen extends StatelessWidget {
                                             OrderFlowController.performRoleAction(UserRole.pelanggan);
                                           }
                                         } else {
-                                          // Other actions
+                                         
                                           OrderFlowController.performRoleAction(UserRole.pelanggan);
                                         }
                                       }

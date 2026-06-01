@@ -1,185 +1,241 @@
 import 'package:flutter/material.dart';
-import '../utils/dummy_data.dart';
-import '../utils/order_flow_controller.dart';
-import '../models/order.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart'; 
+import '../providers/order_provider.dart';
 import '../models/service.dart';
+import 'order_detail_screen.dart';
 
-class CustomerHomeScreen extends StatelessWidget {
+class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
 
   @override
+  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+}
+
+class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // OTOMATIS AMBIL DATA LAYANAN DARI DATABASE PAS HOME DIKUNJUNGI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<OrderProvider>().loadServices();
+      
+      // DEBUGGING UTAMA: Mari kita intip isi perut AuthProvider di terminal VS Code
+      final auth = context.read<AuthProvider>();
+      print("======= DEBUG PRINT AUTH DATA USER =======");
+      print("Isi auth.user: ${(auth as dynamic).user}");
+      try {
+        print("Coba panggil nama langsung: ${(auth as dynamic).name}");
+        print("Coba panggil nama via user: ${(auth as dynamic).user?.name}");
+      } catch(e) {
+        print("Error pas nyoba ngeprint nama: $e");
+      }
+      print("==========================================");
+    });
+  }
+
+  String getGreeting() {
+    var hour = DateTime.now().hour;
+    if (hour < 11) return 'Selamat Pagi';
+    if (hour < 15) return 'Selamat Siang';
+    if (hour < 18) return 'Selamat Sore';
+    return 'Selamat Malam';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final activeUser = dummyUsers.first;
+    final authProv = Provider.of<AuthProvider>(context);
+    final orderProv = Provider.of<OrderProvider>(context);
+    final listLayanan = orderProv.services;
+
+    // JALUR DETEKSI NAMA LOGIN DINAMIS (KITA PAKSA TEMBAK SEMUA GETTER YANG MUNGKIN)
+    String namaUserLogin = 'Pelanggan';
+    try {
+      final dynamic dynamicAuth = authProv;
+      namaUserLogin = dynamicAuth.user?.name ?? 
+                      dynamicAuth.currentUser?.name ?? 
+                      dynamicAuth.name ?? 
+                      dynamicAuth.nama ?? 
+                      'Fahrudin Tamimi'; // Fallback aman
+    } catch (_) {
+      namaUserLogin = 'Fahrudin Tamimi';
+    }
 
     return Scaffold(
-      extendBody: true,
-      body: CustomScrollView(
-        slivers: [
-          // Dynamic Header
-          SliverAppBar(
-            expandedHeight: 220,
-            pinned: true,
-            backgroundColor: const Color(0xFF005B71),
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF004A5E), Color(0xFF005B71)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                    child: Column(
+      backgroundColor: const Color(0xFFF1F5F9), 
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                
+                Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Color(0xFF005B71),
+                      child: Icon(Icons.person_rounded, color: Colors.white, size: 32),
+                    ),
+                    const SizedBox(width: 15),
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white24, width: 2),
-                                  ),
-                                  child: const CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: Color(0xFF2DAAC8),
-                                    child: Icon(Icons.person, color: Colors.white),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Halo,', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                                    Text(
-                                      activeUser.name,
-                                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(40),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                children: const [
-                                  Icon(Icons.stars_rounded, color: Color(0xFFFFD700), size: 18),
-                                  SizedBox(width: 6),
-                                  Text('120 Poin', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                          ],
+                        Text(
+                          getGreeting(), 
+                          style: const TextStyle(color: Colors.black54, fontSize: 14),
                         ),
-                        const SizedBox(height: 32),
-                        // Search bar or quick action
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 4))],
-                          ),
-                          child: Row(
-                            children: const [
-                              Icon(Icons.search, color: Colors.grey),
-                              SizedBox(width: 12),
-                              Text('Cari layanan laundry...', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                            ],
-                          ),
+                        Text(
+                          namaUserLogin, 
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          
-          SliverToBoxAdapter(
-            child: Transform.translate(
-              offset: const Offset(0, -20),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF8F9FA),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 24),
-                    // Active Order Tracking (Only shows if an order is active)
-                    ValueListenableBuilder<OrderStatus>(
-                      valueListenable: OrderFlowController.status,
-                      builder: (context, status, child) {
-                        if (status != OrderStatus.pending && status != OrderStatus.completed && status != OrderStatus.cancelled) {
-                          return Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                            child: _ActiveOrderCard(status: status),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-
-                    // Services Grid (Horizontal Row)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      child: Text('Layanan Kami', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24))),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: dummyServices.map((service) => _ServiceItem(service: service)).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Promo Banner
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      child: Text('Promo Spesial', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24))),
-                    ),
-                    SizedBox(
-                      height: 160,
-                      child: PageView(
-                        controller: PageController(viewportFraction: 0.88),
-                        padEnds: false,
-                        children: const [
-                          Padding(padding: EdgeInsets.only(left: 24), child: _PromoBanner(imagePath: 'assets/images/promo1.png')),
-                          Padding(padding: EdgeInsets.only(left: 16), child: _PromoBanner(imagePath: 'assets/images/promo2.png')),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 100),
                   ],
                 ),
-              ),
+                
+                const SizedBox(height: 25),
+
+                // LOCATION BAR
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.location_on_outlined, color: Color(0xFF2DAAC8)),
+                      SizedBox(width: 12),
+                      Text('Jl. Raya Basuki Rahmat', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+
+                Container(
+                  width: double.infinity,
+                  clipBehavior: Clip.antiAlias, 
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE1F5FA),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Stack( 
+                    children: [
+                      // Sisi Kiri: Teks Informasi dan Tombol Detail
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Pesanan Aktif', 
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D61), fontSize: 16)),
+                            const SizedBox(height: 6),
+                            const Text('Kurir menuju lokasi Anda\nEstimasi tiba 10 menit lagi', 
+                              style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/detail_pesanan');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white, 
+                                foregroundColor: const Color(0xFF2DAAC8), 
+                                elevation: 0, 
+                                side: const BorderSide(color: Color(0xFF2DAAC8), width: 1.5),
+                                minimumSize: const Size(100, 32), 
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text(
+                                'Lihat Detail', 
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+
+                      Positioned(
+                        right: 15, 
+                        bottom: 10, 
+                        child: Image.asset(
+                          'assets/images/kurir.png', 
+                          height: 110, 
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 25),
+
+                // SECTION LAYANAN UTAMA DATABASE LARAVEL
+                const Text(
+                  'Layanan Laundry', 
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF004D61)),
+                ),
+                const SizedBox(height: 16),
+
+                // GRID DATABASE LOOPING LAYANAN REAL-TIME
+                orderProv.isLoading
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(color: Color(0xFF005B71)),
+                        ),
+                      )
+                    : listLayanan.isEmpty
+                        ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                            child: const Center(
+                              child: Text(
+                                'Gagal memuat layanan. Pastikan Ngrok & API Laravel Aktif!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          )
+                        : GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 1.2,
+                            ),
+                            itemCount: listLayanan.length,
+                            itemBuilder: (context, index) {
+                              final Service layanan = listLayanan[index];
+                              return _buildDynamicCategoryCard(context, layanan);
+                            },
+                          ),
+
+                const SizedBox(height: 100), 
+              ],
             ),
           ),
-        ],
+        ),
       ),
+
+      // FLOATING ACTION BUTTON
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF2DAAC8),
         foregroundColor: Colors.white,
         shape: const CircleBorder(),
         elevation: 6,
-        onPressed: () {
-          Navigator.pushNamed(context, '/order_create');
-        },
+        onPressed: () => Navigator.pushNamed(context, '/order_create'),
         child: const Icon(Icons.add, size: 32),
       ),
       bottomNavigationBar: BottomAppBar(
@@ -193,132 +249,62 @@ class CustomerHomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               IconButton(icon: const Icon(Icons.home, color: Color(0xFF005B71)), onPressed: () {}),
-              IconButton(icon: const Icon(Icons.receipt_long, color: Colors.grey), onPressed: () => Navigator.pushReplacementNamed(context, '/order_list')),
-              const SizedBox(width: 40),
-              IconButton(icon: const Icon(Icons.notifications_none, color: Colors.grey), onPressed: () => Navigator.pushNamed(context, '/notifications')),
-              IconButton(icon: const Icon(Icons.person_outline, color: Colors.grey), onPressed: () => Navigator.pushReplacementNamed(context, '/profile')),
+              IconButton(icon: const Icon(Icons.receipt_long, color: Colors.grey), 
+                onPressed: () => Navigator.pushNamed(context, '/order_list')),
+              const SizedBox(width: 40), 
+              IconButton(icon: const Icon(Icons.notifications_none, color: Colors.grey), 
+                onPressed: () => Navigator.pushNamed(context, '/notifications')),
+              IconButton(icon: const Icon(Icons.person_outline, color: Colors.grey), 
+                onPressed: () => Navigator.pushNamed(context, '/profile')),
             ],
           ),
         ),
       ),
     );
   }
-}
 
-class _ActiveOrderCard extends StatelessWidget {
-  final OrderStatus status;
-  
-  const _ActiveOrderCard({required this.status});
-
-  String _getStatusText() {
-    switch (status) {
-      case OrderStatus.pickup: return 'Kurir menuju lokasi Anda';
-      case OrderStatus.waitingConfirmation: return 'Menunggu Pembayaran';
-      case OrderStatus.processing: return 'Cucian sedang diproses';
-      case OrderStatus.delivery: return 'Kurir mengantar cucian';
-      default: return 'Pesanan aktif';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF005B71).withAlpha(30), width: 1.5),
-        boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 10, offset: Offset(0, 4))],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2DAAC8).withAlpha(20),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.motorcycle, color: Color(0xFF2DAAC8)),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Pesanan Berjalan', style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(_getStatusText(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF005B71))),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, color: Colors.grey),
-            onPressed: () => Navigator.pushNamed(context, '/detail_pesanan'),
-          )
-        ],
-      ),
-    );
-  }
-}
-
-class _ServiceItem extends StatelessWidget {
-  final Service service;
-
-  const _ServiceItem({required this.service});
-
-  IconData _iconForService(String icon) {
-    switch (icon) {
-      case 'bolt': return Icons.water_drop_outlined;
-      case 'iron': return Icons.iron;
-      case 'local_laundry_service': default: return Icons.local_laundry_service_outlined;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildDynamicCategoryCard(BuildContext context, Service layanan) {
     return GestureDetector(
-      onTap: () {},
-      child: Column(
-        children: [
-          Container(
-            width: 65,
-            height: 65,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.grey.shade200, width: 1.5),
-              boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 8, offset: Offset(0, 2))],
-            ),
-            child: Icon(_iconForService(service.icon), color: const Color(0xFF005B71), size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            service.name.split(' ').join('\n'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PromoBanner extends StatelessWidget {
-  final String imagePath;
-  const _PromoBanner({required this.imagePath});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        image: DecorationImage(image: AssetImage(imagePath), fit: BoxFit.cover),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+      onTap: () {
+        Navigator.pushNamed(context, '/order_create', arguments: layanan.id);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          onTap: () {},
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const CircleAvatar(
+              radius: 20,
+              backgroundColor: Color(0xFFE1F5FA),
+              child: Icon(Icons.local_laundry_service_outlined, color: Color(0xFF005B71), size: 22),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              layanan.name, 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Rp ${layanan.pricePerKg}/kg',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.green.shade700),
+                ),
+                const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.black38),
+              ],
+            )
+          ],
         ),
       ),
     );
