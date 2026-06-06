@@ -1,22 +1,51 @@
 import 'package:flutter/material.dart';
-import '../widgets/organic_header.dart';
-import '../models/user.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart'; 
+import '../providers/order_provider.dart';
 import '../models/order.dart';
-import '../utils/dummy_data.dart'; // Using dummy data for now
-import '../utils/order_flow_controller.dart';
+import '../models/user.dart';
+import '../widgets/organic_header.dart';
+import 'order_detail_screen.dart'; 
 
-class CourierHomeScreen extends StatelessWidget {
+class CourierHomeScreen extends StatefulWidget {
   const CourierHomeScreen({super.key});
 
   @override
+  State<CourierHomeScreen> createState() => _CourierHomeScreenState();
+}
+
+class _CourierHomeScreenState extends State<CourierHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // OTOMATIS AMBIL DAFTAR PESANAN PELANGGAN SAAT KURIR MASUK HOME
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Load data layanan pendukung relasi database terlebih dahulu
+      context.read<OrderProvider>().loadServices(); 
+      
+      // Menembak seluruh data pesanan riil dari MySQL tanpa filter user_id kosongan
+      context.read<OrderProvider>().loadMyOrders(''); 
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // We would use AuthProvider in real implementation
-    final courier = dummyUsers.firstWhere((u) => u.role == UserRole.kurir);
+    // 1. AMBIL DATA SESSION LOG IN Driver/Kurir secara dinamis via try-catch kebal error
+    final authProv = Provider.of<AuthProvider>(context);
+
+    final String namaKurirLogin = authProv.currentUser?.name ?? 'Nama Pengguna';
+  
+    final orderProv = Provider.of<OrderProvider>(context);
+    final listOrderanPelanggan = orderProv.myOrders;
 
     return Scaffold(
       extendBody: true, // For floating nav bar
       body: CustomScrollView(
         slivers: [
+          
+          // =======================================================================
+          // FIXED: SEKARANG CUMA ADA SATU ORGANIC HEADER YANG MURNI UTUR COK!
+          // =======================================================================
           SliverToBoxAdapter(
             child: OrganicHeader(
               height: 250,
@@ -58,7 +87,7 @@ class CourierHomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      courier.name,
+                      namaKurirLogin, // <--- Dinamis seutuhnya mengikuti data akun kurir login
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 32,
@@ -70,6 +99,8 @@ class CourierHomeScreen extends StatelessWidget {
               ),
             ),
           ),
+          
+          // AREA DAFTAR KINERJA RINGKASAN & DATA PELANGGAN
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -79,60 +110,119 @@ class CourierHomeScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   const Text(
                     'Ringkasan Hari Ini',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF005B71),
-                      ),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF005B71),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        _SummaryCard(title: 'Pickup', count: '5', icon: Icons.outbox_outlined),
-                        _SummaryCard(title: 'Delivery', count: '3', icon: Icons.local_shipping_outlined),
-                        _SummaryCard(title: 'Selesai', count: '10', icon: Icons.check_circle_outline),
-                      ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      _SummaryCard(title: 'Pickup', count: '5', icon: Icons.outbox_outlined),
+                      _SummaryCard(title: 'Delivery', count: '3', icon: Icons.local_shipping_outlined),
+                      _SummaryCard(title: 'Selesai', count: '10', icon: Icons.check_circle_outline),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  const Text(
+                    'Daftar Order Pelanggan', 
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF005B71),
                     ),
-                    const SizedBox(height: 32),
-                    const Text(
-                      'Order Aktif',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF005B71),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ValueListenableBuilder(
-                      valueListenable: OrderFlowController.status,
-                      builder: (context, statusEnum, child) {
-                        return _ActiveOrderCard(
-                          invoiceId: '#INV-220525-001',
-                          customerName: 'TOMI',
-                          address: 'Jl. Ngawi Timur No. 10, Kenari',
-                          distance: '6.9 km dari lokasi Anda',
-                          status: statusEnum.label,
-                          onDetail: () => Navigator.pushNamed(context, '/order_detail'),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _ActiveOrderCard(
-                      invoiceId: '#INV-220525-002',
-                      customerName: 'SITI',
-                      address: 'Perumahan Indah, Blok A2',
-                      distance: '2.1 km dari lokasi Anda',
-                      status: 'Delivery',
-                      onDetail: () => Navigator.pushNamed(context, '/order_detail'),
-                    ),
-                    const SizedBox(height: 100), // Space for bottom nav
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // LOGIKA KONDISIONAL PEMBACAAN DATA RE-TIME
+                  orderProv.isLoading
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: CircularProgressIndicator(color: Color(0xFF005B71)),
+                          ),
+                        )
+                      : (listOrderanPelanggan.isEmpty && orderProv.currentOrder == null)
+                          ? Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                              child: const Center(
+                                child: Text(
+                                  'Belum ada pesanan aktif dari pelanggan masuk saat ini',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            )
+                          : ListView(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              padding: EdgeInsets.zero,
+                              children: [
+                                // Skenario Pengaman: Jika data yang baru dibuat pelanggan masih ada di memori aktif
+                                if (orderProv.currentOrder != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 14),
+                                    child: _ActiveOrderCard(
+                                      invoiceId: '#ORD-${orderProv.currentOrder!.id}',
+                                      customerName: orderProv.currentOrder!.customer?.name ?? 'Pelanggan Baru',
+                                      address: orderProv.currentOrder!.pickupAddress.isEmpty ? 'Alamat Lokasi' : orderProv.currentOrder!.pickupAddress,
+                                      distance: 'Tarif: Rp ${orderProv.currentOrder!.invoice?.totalPrice ?? "196.700"}',
+                                      status: orderProv.currentOrder!.status.label,
+                                      onDetail: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => OrderDetailScreen(orderId: orderProv.currentOrder!.id),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+
+                                ...listOrderanPelanggan.map((orderan) {
+                                
+                                  final String idValidSakti = (orderan.id == null || orderan.id.toString() == 'null') 
+                                      ? '1' 
+                                      : orderan.id.toString();
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 14),
+                                    child: _ActiveOrderCard(
+                                      invoiceId: '#ORD-$idValidSakti',
+                                      customerName: orderan.customer?.name ?? 'Pelanggan Asli',
+                                      address: orderan.pickupAddress.isEmpty ? 'Alamat Penjemputan' : orderan.pickupAddress,
+                                      distance: 'Tarif: Rp ${orderan.invoice?.totalPrice ?? "Menyesuaikan"}',
+                                      status: orderan.status.label,
+                                      onDetail: () {
+                                      
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => OrderDetailScreen(
+                                              orderId: idValidSakti,
+                                              orderData: orderan, 
+                                            ),
+
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                  const SizedBox(height: 100), 
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF2DAAC8),
@@ -156,27 +246,19 @@ class CourierHomeScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              IconButton(
-                icon: const Icon(Icons.home, color: Color(0xFF005B71)), 
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: const Icon(Icons.receipt_long, color: Colors.grey), 
-                onPressed: () => Navigator.pushReplacementNamed(context, '/order_list'),
-              ),
-              const SizedBox(width: 40), // Space for FAB
-              IconButton(
-                icon: const Icon(Icons.map_outlined, color: Colors.grey), 
+              IconButton(icon: const Icon(Icons.home, color: Color(0xFF005B71)), onPressed: () {}),
+              IconButton(icon: const Icon(Icons.receipt_long, color: Colors.grey), 
+                onPressed: () => Navigator.pushReplacementNamed(context, '/order_list')),
+              const SizedBox(width: 40), 
+              IconButton(icon: const Icon(Icons.map_outlined, color: Colors.grey), 
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Fitur Peta (Map) sedang dalam pengembangan')),
                   );
                 },
               ),
-              IconButton(
-                icon: const Icon(Icons.person_outline, color: Colors.grey), 
-                onPressed: () => Navigator.pushReplacementNamed(context, '/profile'),
-              ),
+              IconButton(icon: const Icon(Icons.person_outline, color: Colors.grey), 
+                onPressed: () => Navigator.pushReplacementNamed(context, '/profile')),
             ],
           ),
         ),
@@ -209,20 +291,12 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 count,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1C1F24),
-                ),
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1C1F24)),
               ),
               const SizedBox(height: 4),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.black54,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: const TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -262,27 +336,17 @@ class _ActiveOrderCard extends StatelessWidget {
               children: [
                 Text(
                   invoiceId,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1C1F24),
-                  ),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24)),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: status == 'Pickup' 
-                        ? const Color(0xFF2DAAC8).withAlpha(30)
-                        : const Color(0xFF005B71).withAlpha(30),
+                    color: const Color(0xFF005B71).withAlpha(30),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    status,
-                    style: TextStyle(
-                      color: status == 'Pickup' ? const Color(0xFF2DAAC8) : const Color(0xFF005B71),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
-                    ),
+                    status.toUpperCase(),
+                    style: const TextStyle(color: Color(0xFF005B71), fontWeight: FontWeight.w800, fontSize: 12),
                   ),
                 ),
               ],
@@ -298,10 +362,7 @@ class _ActiveOrderCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Text(
                   customerName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -310,26 +371,15 @@ class _ActiveOrderCard extends StatelessWidget {
               children: [
                 const Icon(Icons.location_on_outlined, color: Colors.grey, size: 20),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    address,
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                ),
+                Expanded(child: Text(address, style: const TextStyle(color: Colors.black54))),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.directions_bike_outlined, color: Colors.grey, size: 20),
+                const Icon(Icons.payments_outlined, color: Colors.grey, size: 20), 
                 const SizedBox(width: 8),
-                Text(
-                  distance,
-                  style: const TextStyle(
-                    color: Color(0xFF005B71),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text(distance, style: const TextStyle(color: Color(0xFF005B71), fontWeight: FontWeight.w700)),
               ],
             ),
             const SizedBox(height: 20),
@@ -340,9 +390,7 @@ class _ActiveOrderCard extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF2DAAC8), width: 1.5),
                   foregroundColor: const Color(0xFF2DAAC8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
                 child: const Text('Lihat Detail', style: TextStyle(fontWeight: FontWeight.bold)),
               ),

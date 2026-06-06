@@ -137,26 +137,7 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // SizedBox(
-                //   width: double.infinity,
-                //   child: ElevatedButton(
-                //     onPressed: () {
-                //       Navigator.pop(context); 
-                //       Navigator.pushReplacementNamed(context, '/detail_pesanan');
-                //     },
-                //     style: ElevatedButton.styleFrom(
-                //       backgroundColor: const Color(0xFF2DAAC8),
-                //       padding: const EdgeInsets.symmetric(vertical: 16),
-                //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                //     ),
-                //     child: const Text('Lacak Pesanan', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
-                //   ),
-                // ),
-
                 //sementara id 10
-               // =======================================================================
-                // TOMBOL LACAK PESANAN: SINKRON SAKLEK JALUR LOGIN DINAMIS (ANTI HARDCODE)
-                // =======================================================================
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -164,12 +145,11 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
                       // 1. Tutup popup dialog suksesnya
                       Navigator.pop(context); 
 
-                      // 2. LANGSUNG LOMPAT KE DETAIL SCREEN TANPA BAWA ID ARTIFISIAL!
                       // Biarkan initState di DetailScreen yang mendeteksi session user login.
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const OrderDetailScreen(), // <--- Bersih tanpa parameter!
+                          builder: (context) => const OrderDetailScreen(), 
                         ),
                       );
                     },
@@ -188,7 +168,7 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal membuat pesanan. Server Laravel bermasalah.')),
+          const SnackBar(content: Text('Gagal membuat pesanan. Server bermasalah.')),
         );
       }
     } catch (e) {
@@ -317,7 +297,7 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
                                   const Icon(Icons.cloud_off_outlined, size: 36, color: Colors.grey),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Layanan kosong atau Ngrok Offline.\n(Pastikan API GET /services sudah aktif)',
+                                    'Layanan kosong.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500),
                                   ),
@@ -393,10 +373,10 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
                                           color: isSelected ? const Color(0xFF005B71) : Colors.green.shade700,
                                         ),
                                       ),
-                                      Text(
-                                        "ID: ${service.id}", 
-                                        style: const TextStyle(fontSize: 9, color: Colors.grey),
-                                      )
+                                      // Text(
+                                      //   "ID: ${service.id}", 
+                                      //   style: const TextStyle(fontSize: 9, color: Colors.grey),
+                                      // )
                                     ],
                                   ),
 

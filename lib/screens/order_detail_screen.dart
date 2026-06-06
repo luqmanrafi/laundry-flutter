@@ -9,43 +9,44 @@ import '../providers/auth_provider.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String? orderId; // Menampung kiriman ID Order dari halaman list/riwayat
-  const OrderDetailScreen({super.key, this.orderId});
+  final Order? orderData;
+  const OrderDetailScreen({super.key, this.orderId, this.orderData,});
 
   @override
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
-@override
+ @override
   void initState() {
     super.initState();
-   
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final orderProv = context.read<OrderProvider>();
 
       if (widget.orderId == null) {
-        print(" Basket: Navigasi datang dari Home Screen. Mencari orderan aktif milik user...");
+        print(" Basket: Navigasi datang dari Home Screen. Mencari orderan aktif...");
         
-        if (orderProv.myOrders.isNotEmpty) {
-          
+        if (orderProv.currentOrder != null) {
+          print(" Sukses Mengamankan Data Aktif Langsung dari Provider: ID #ORD-${orderProv.currentOrder!.id}");
+          OrderFlowController.status.value = orderProv.currentOrder!.status;
+          if (mounted) setState(() {});
+        } 
+       
+        else if (orderProv.myOrders.isNotEmpty) {
           final orderAktifUser = orderProv.myOrders.first; 
-          
           try {
             (orderProv as dynamic).currentOrder = orderAktifUser;
-          } catch (_) {
-            
-            try {
-              (orderProv as dynamic).setCurrentOrder(orderAktifUser);
-            } catch (e) {
-              print("Gagal set data via dynamic setter, tapi abaikan saja cok biar lanjut: $e");
-            }
+            OrderFlowController.status.value = orderAktifUser.status;
+          } catch (e) {
+            print("Gagal set data via dynamic setter: $e");
           }
-          
           if (mounted) setState(() {});
-          print(" Sukses Mengamankan Order ID Dinamis dari Home: ${orderAktifUser.id}");
-        } else {
-          
-          print(" Riwayat kosong, terpaksa fallback ke ID Demo 10");
+          print(" Sukses Mengamankan Order ID Dinamis dari Riwayat: ${orderAktifUser.id}");
+        } 
+
+        else {
+          print(" Riwayat & Memori kosong, terpaksa fallback ke ID Demo 10");
           orderProv.loadOrderDetail('10');
         }
       } 
@@ -211,7 +212,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF005B71)),
                   ),
                   const SizedBox(height: 20),
-                  OrderStatusStepper(status: order.status), // Stepper Mengunci Status DB
+                  OrderStatusStepper(status: order.status), 
                 ],
               ),
             ),
@@ -300,30 +301,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       ),
 
-      // BOTTOM NAVIGATION BAR 
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
           child: Builder(
             builder: (context) {
-             
               final authProv = Provider.of<AuthProvider>(context, listen: false);
             
               UserRole roleLogin = UserRole.pelanggan;
               try {
-               
-                roleLogin = (authProv as dynamic).user?.role ?? 
-                            (authProv as dynamic).currentUser?.role ?? 
-                            UserRole.pelanggan;
+                final dynamic dynamicAuth = authProv;
+                
+                // Ambil string role dari provider kawanmu
+                final String? roleStr = dynamicAuth.role?.toString() ?? 
+                                       dynamicAuth.userRole?.toString();
+                
+                // Jika terdeteksi kata 'kurir' atau 'courier', ubah role ke kurir
+                if (roleStr != null && (roleStr.toLowerCase().contains('kurir') || roleStr.toLowerCase().contains('courier'))) {
+                  roleLogin = UserRole.kurir;
+                }
               } catch (_) {
-                roleLogin = UserRole.pelanggan;
+                roleLogin = UserRole.pelanggan; // Amankan ke pelanggan kalau eror
               }
 
               final canAct = OrderFlowController.canRoleAct(roleLogin);
               final label = OrderFlowController.actionLabelForRole(roleLogin);
 
-              //role pelanggan
               if (roleLogin == UserRole.pelanggan) {
                 return Container(
                   height: 56,
@@ -339,7 +343,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 );
               }
 
-              //role admin
               return ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2DAAC8),
@@ -350,7 +353,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
                 onPressed: canAct
                     ? () {
-                        if (order.status == OrderStatus.dibawa_kurir_ke_laundry) {
+                        if (order!.status == OrderStatus.dibawa_kurir_ke_laundry) {
                           Navigator.pushReplacementNamed(context, '/invoice_create');
                           return;
                         }
@@ -365,7 +368,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ),
       ),
-
     );
   }
 

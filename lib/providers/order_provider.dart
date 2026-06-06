@@ -6,14 +6,14 @@ import 'package:http/http.dart' as http;
 import '../models/order.dart';
 import '../models/service.dart';
 import '../repositories/order_repository.dart';
-import '../utils/order_flow_controller.dart'; // Impor flow controller untuk auto-sync status global
+import '../utils/order_flow_controller.dart'; 
 
 class OrderProvider extends ChangeNotifier {
   final OrderRepository _repository = OrderRepository();
   
   List<Service> _services = [];
   List<Order> _myOrders = [];
-  Order? _currentOrder; // 1. Variabel baru penampung detail order yang sedang aktif dilihat
+  Order? _currentOrder; 
   bool _isLoading = false;
 
   List<Service> get services => _services;
@@ -39,21 +39,17 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
-  // =======================================================================
-  // 2. FUNGSI BARU: AMBIL DETAIL ORDER REAL-TIME DARI BACKEND LARAVEL
-  // =======================================================================
   Future<void> loadOrderDetail(String orderId) async {
     _setLoading(true);
     try {
       final result = await _repository.fetchOrderDetail(orderId);
       if (result != null) {
         _currentOrder = result;
-        
-        // Otomatis sinkronkan status state global agar stepper UI ikut melompat maju!
+       
         OrderFlowController.status.value = result.status;
       }
     } catch (e) {
-      print("❌ Error di Provider pas load detail order: $e");
+      print(" Error di Provider pas load detail order: $e");
     } finally {
       _setLoading(false);
     }
@@ -84,12 +80,12 @@ class OrderProvider extends ChangeNotifier {
       final int finalServiceId = int.tryParse(cleanServiceId) ?? 1; 
 
       print("=================== INFO PAYLOAD FLUTTER ===================");
-      print("🚀 URL API          : $url");
-      print("👤 USER ID (UUID)   : $savedUserId");
-      print("🧺 ID SERVICE (AUTO): $finalServiceId ");
-      print("📍 KOORDINAT LAT    : $latitude");
-      print("📍 KOORDINAT LONG   : $longitude");
-      print("📡 Status           : Mengirim via AUTOMATIC PURE INT JSON...");
+      print(" URL API          : $url");
+      print(" USER ID (UUID)   : $savedUserId");
+      print(" ID SERVICE (AUTO): $finalServiceId ");
+      print(" KOORDINAT LAT    : $latitude");
+      print(" KOORDINAT LONG   : $longitude");
+      print(" Status           : Mengirim via AUTOMATIC PURE INT JSON...");
       print("============================================================");
 
       final response = await http.post(
@@ -129,8 +125,8 @@ class OrderProvider extends ChangeNotifier {
         }),
       );
 
-      print("🚨 STATUS RESPONS LARAVEL: ${response.statusCode}");
-      print("📦 BODY RESPONS LARAVEL  : ${response.body}");
+      print("STATUS RESPONS LARAVEL: ${response.statusCode}");
+      print("BODY RESPONS LARAVEL  : ${response.body}");
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         // Jika data API response me-return object order baru, simpan ke currentOrder
@@ -147,7 +143,7 @@ class OrderProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print("❌ CRASH ERROR KONEKSI DI PROVIDER: $e");
+      print("CRASH ERROR KONEKSI DI PROVIDER: $e");
       return false;
     } finally {
       _setLoading(false);

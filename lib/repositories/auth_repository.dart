@@ -5,7 +5,6 @@ import '../models/user.dart';
 
 class AuthRepository {
   
-  // 1. LOGIN REAL-TIME (Sekarang mengembalikan Map utuh agar Token asli dari Laravel ketangkap)
   Future<Map<String, dynamic>?> login(String email, String password) async {
     if (!dotenv.isInitialized) {
       await dotenv.load();
@@ -32,7 +31,7 @@ class AuthRepository {
       print("Jawaban Mentah Backend: ${response.statusCode} -> ${response.body}");
 
       if (response.statusCode == 200) {
-        // JALAN NINJA: Mengembalikan Map JSON mentah utuh dari Laravel!
+       
         return jsonDecode(response.body);
       }
       

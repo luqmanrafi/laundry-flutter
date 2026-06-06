@@ -16,11 +16,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   @override
   void initState() {
     super.initState();
-    // OTOMATIS AMBIL DATA LAYANAN DARI DATABASE PAS HOME DIKUNJUNGI
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<OrderProvider>().loadServices();
-      
-      // DEBUGGING UTAMA: Mari kita intip isi perut AuthProvider di terminal VS Code
+     
       final auth = context.read<AuthProvider>();
       print("======= DEBUG PRINT AUTH DATA USER =======");
       print("Isi auth.user: ${(auth as dynamic).user}");
@@ -48,18 +47,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final orderProv = Provider.of<OrderProvider>(context);
     final listLayanan = orderProv.services;
 
-    // JALUR DETEKSI NAMA LOGIN DINAMIS (KITA PAKSA TEMBAK SEMUA GETTER YANG MUNGKIN)
-    String namaUserLogin = 'Pelanggan';
-    try {
-      final dynamic dynamicAuth = authProv;
-      namaUserLogin = dynamicAuth.user?.name ?? 
-                      dynamicAuth.currentUser?.name ?? 
-                      dynamicAuth.name ?? 
-                      dynamicAuth.nama ?? 
-                      'Fahrudin Tamimi'; // Fallback aman
-    } catch (_) {
-      namaUserLogin = 'Fahrudin Tamimi';
-    }
+    final String namaUserLogin = authProv.currentUser?.name ?? 'Nama Pengguna';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9), 
@@ -127,7 +115,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                   child: Stack( 
                     children: [
-                      // Sisi Kiri: Teks Informasi dan Tombol Detail
+                      
                       Padding(
                         padding: const EdgeInsets.all(20),
                         child: Column(
@@ -177,14 +165,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 
                 const SizedBox(height: 25),
 
-                // SECTION LAYANAN UTAMA DATABASE LARAVEL
                 const Text(
                   'Layanan Laundry', 
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF004D61)),
                 ),
                 const SizedBox(height: 16),
 
-                // GRID DATABASE LOOPING LAYANAN REAL-TIME
                 orderProv.isLoading
                     ? const Center(
                         child: Padding(
@@ -199,7 +185,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
                             child: const Center(
                               child: Text(
-                                'Gagal memuat layanan. Pastikan Ngrok & API Laravel Aktif!',
+                                'Gagal memuat layanan.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
                               ),
