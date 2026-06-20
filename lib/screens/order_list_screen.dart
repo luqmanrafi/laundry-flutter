@@ -3,10 +3,38 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
 import '../models/order.dart';
+import '../providers/order_provider.dart';
 import '../utils/order_flow_controller.dart';
-
-class OrderListScreen extends StatelessWidget {
+import 'order_detail_screen.dart';
+import 'customer_order_detail_screen.dart';
+import '../widgets/address_text.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'courier_tracking_screen.dart';
+class OrderListScreen extends StatefulWidget {
   const OrderListScreen({super.key});
+
+  @override
+  State<OrderListScreen> createState() => _OrderListScreenState();
+}
+
+class _OrderListScreenState extends State<OrderListScreen> {
+  String _activeFilter = 'Semua';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      if (auth.currentUser != null) {
+        context.read<OrderProvider>().loadMyOrders(auth.currentUser!.id);
+      } else {
+        SharedPreferences.getInstance().then((prefs) {
+          final userId = prefs.getString('user_id') ?? '';
+          context.read<OrderProvider>().loadMyOrders(userId); 
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,67 +64,115 @@ class OrderListScreen extends StatelessWidget {
                 ],
               ),
             ),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: const [
-                  _FilterChip(label: 'Semua', selected: false),
-                  _FilterChip(label: 'Menunggu', selected: false),
-                  _FilterChip(label: 'Pickup', selected: true),
-                  _FilterChip(label: 'Proses', selected: false),
-                  _FilterChip(label: 'Selesai', selected: false),
-                ],
+            SizedBox(
+              height: 48,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  'Semua',
+                  'Menunggu',
+                  'Pickup',
+                  'Proses',
+                  'Selesai',
+                ].map((filter) {
+                  return _FilterChip(
+                    label: filter,
+                    selected: _activeFilter == filter,
+                    onTap: () {
+                      setState(() {
+                        _activeFilter = filter;
+                      });
+                    },
+                  );
+                }).toList(),
               ),
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  ValueListenableBuilder(
-                    valueListenable: OrderFlowController.status,
-                    builder: (context, statusEnum, child) {
-                      return _OrderCard(
-                        id: '#INV-220525-001',
-                        name: isCourier ? 'Tomi' : 'Cuci Kering',
-                        subtitle: 'Jl. Ngawi Timur No. 10, Kenari',
-                        status: statusEnum.label,
-                        time: '10:00 - 12:00',
-                        isCourier: isCourier,
+              child: Consumer<OrderProvider>(
+                builder: (context, orderProv, child) {
+                  if (orderProv.isLoading && orderProv.myOrders.isEmpty) {
+                    return const Center(child: CircularProgressIndicator(color: Color(0xFF005B71)));
+                  }
+
+                  List<Order> allOrders = List.from(orderProv.myOrders);
+                  if (orderProv.currentOrder != null && !allOrders.any((o) => o.id == orderProv.currentOrder!.id)) {
+                    allOrders.insert(0, orderProv.currentOrder!);
+                  }
+
+                  final filteredOrders = allOrders.where((order) {
+                    if (_activeFilter == 'Semua') return true;
+                    
+                    if (_activeFilter == 'Menunggu') {
+                      return order.status == OrderStatus.pending;
+                    }
+                    if (_activeFilter == 'Pickup') {
+                      return order.status == OrderStatus.dibawa_kurir_ke_laundry || order.status == OrderStatus.kurir_menuju_lokasi;
+                    }
+                    if (_activeFilter == 'Proses') {
+                      return order.status == OrderStatus.sedang_dicuci ||
+                          order.status == OrderStatus.siap_dikirim ||
+                          order.status == OrderStatus.proses_pengantaran;
+                    }
+                    if (_activeFilter == 'Selesai') {
+                      return order.status == OrderStatus.selesai ||
+                          order.status == OrderStatus.cancelled;
+                    }
+                    return true;
+                  }).toList();
+
+                  if (filteredOrders.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'Belum ada riwayat pesanan untuk kategori ini.',
+                        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: filteredOrders.length + 1, // +1 for spacing at the bottom
+                    itemBuilder: (context, index) {
+                      if (index == filteredOrders.length) {
+                        return const SizedBox(height: 100);
+                      }
+
+                      final order = filteredOrders[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _OrderCard(
+                          id: '#ORD-${order.id}',
+                          name: isCourier ? order.customer.name : order.service.name,
+                          subtitle: order.pickupAddress,
+                          status: order.status.label,
+                          time: '${order.pickupDate.day}/${order.pickupDate.month}/${order.pickupDate.year}',
+                          isCourier: isCourier,
+                          realOrderId: order.id, // we will add this to _OrderCard
+                        ),
                       );
                     },
-                  ),
-                  const SizedBox(height: 16),
-                  _OrderCard(
-                    id: '#INV-220525-002',
-                    name: isCourier ? 'Abbad' : 'Setrika Saja',
-                    subtitle: 'Perumahan Indah, Blok A2',
-                    status: 'Proses',
-                    time: 'Selesai 24 Mei',
-                    isCourier: isCourier,
-                  ),
-                  const SizedBox(height: 100), // Space for bottom nav
-                ],
+                  );
+                },
               ),
             ),
           ],
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
+      floatingActionButtonLocation: isCourier ? null : FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: isCourier ? null : FloatingActionButton(
         backgroundColor: const Color(0xFF2DAAC8),
         foregroundColor: Colors.white,
         shape: const CircleBorder(),
         elevation: 4,
         onPressed: () {
-          final msg = isCourier ? 'Fitur Scanner QR sedang dalam pengembangan' : 'Fitur Buat Order sedang dalam pengembangan';
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          Navigator.pushNamed(context, '/order_create');
         },
-        child: Icon(isCourier ? Icons.qr_code_scanner : Icons.add, size: 32),
+        child: const Icon(Icons.add, size: 32),
       ),
       bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
+        shape: isCourier ? null : const CircularNotchedRectangle(),
         notchMargin: 10,
         color: Colors.white,
         elevation: 10,
@@ -118,12 +194,23 @@ class OrderListScreen extends StatelessWidget {
                 icon: const Icon(Icons.receipt_long, color: Color(0xFF005B71)),
                 onPressed: () {}, // Already here
               ),
-              const SizedBox(width: 40), // Space for FAB
+              if (!isCourier) const SizedBox(width: 40), // Space for FAB
               IconButton(
                 icon: Icon(isCourier ? Icons.map_outlined : Icons.notifications_none, color: Colors.grey),
                 onPressed: () {
                   if (isCourier) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur Peta (Map) sedang dalam pengembangan')));
+                    final orderProv = context.read<OrderProvider>();
+                    final activeOrder = orderProv.currentOrder ?? (orderProv.myOrders.isNotEmpty ? orderProv.myOrders.first : null);
+                    if (activeOrder != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => CourierTrackingScreen(orderId: activeOrder.id)),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Belum ada pesanan aktif untuk ditracking')),
+                      );
+                    }
                   } else {
                     Navigator.pushNamed(context, '/notifications');
                   }
@@ -144,25 +231,33 @@ class OrderListScreen extends StatelessWidget {
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
+  final VoidCallback onTap;
 
-  const _FilterChip({required this.label, required this.selected});
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFF2DAAC8) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: selected ? null : Border.all(color: const Color(0xFFD8DDE3)),
-        boxShadow: selected ? const [BoxShadow(color: Color(0x332DAAC8), blurRadius: 6, offset: Offset(0, 3))] : null,
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: selected ? Colors.white : const Color(0xFF7B7D81),
-          fontWeight: FontWeight.w700,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF2DAAC8) : Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: selected ? null : Border.all(color: const Color(0xFFD8DDE3)),
+          boxShadow: selected ? const [BoxShadow(color: Color(0x332DAAC8), blurRadius: 6, offset: Offset(0, 3))] : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF7B7D81),
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -176,6 +271,7 @@ class _OrderCard extends StatelessWidget {
   final String status;
   final String time;
   final bool isCourier;
+  final String? realOrderId;
 
   const _OrderCard({
     required this.id,
@@ -184,6 +280,7 @@ class _OrderCard extends StatelessWidget {
     required this.status,
     required this.time,
     required this.isCourier,
+    this.realOrderId,
   });
 
   @override
@@ -199,8 +296,14 @@ class _OrderCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
           onTap: () {
-            // Fix UX: whole card is clickable
-            Navigator.pushNamed(context, isCourier ? '/order_detail' : '/detail_pesanan');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => isCourier
+                    ? OrderDetailScreen(orderId: realOrderId)
+                    : CustomerOrderDetailScreen(orderId: realOrderId),
+              ),
+            );
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -245,8 +348,8 @@ class _OrderCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  subtitle,
+                AddressText(
+                  address: subtitle,
                   style: const TextStyle(fontSize: 14, color: Colors.black54),
                 ),
                 const SizedBox(height: 16),

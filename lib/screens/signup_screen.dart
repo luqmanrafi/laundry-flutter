@@ -33,19 +33,21 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _register() async {
-    final name = _nameController.text.trim();
+    // Ambil input dari controller (Sudah Benar)
+    final nama = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final repassword = _repasswordController.text;
+    final confirmedPassword = _repasswordController.text;
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+    // VALIDASI (Perhatikan nama variabel di bawah ini)
+    if (nama.isEmpty || email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Semua field harus diisi!')),
       );
       return;
     }
 
-    if (password != repassword) {
+    if (password != confirmedPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password tidak cocok!')),
       );
@@ -53,23 +55,50 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     setState(() => _isLoading = true);
-    final auth = context.read<AuthProvider>();
-    final role = selectedRole == 'Kurir' ? UserRole.kurir : UserRole.pelanggan;
-    final success = await auth.register(name, email, password, role);
-    
-    if (!mounted) return;
-    setState(() => _isLoading = false);
 
-    if (success && auth.currentUser != null) {
-      if (auth.currentUser!.role == UserRole.kurir) {
-        Navigator.pushReplacementNamed(context, '/courier_home');
-      } else {
-        Navigator.pushReplacementNamed(context, '/customer_home');
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pendaftaran Gagal.')),
+    try {
+      final auth = context.read<AuthProvider>();
+      
+      final role = selectedRole.toLowerCase(); 
+
+      print("Daftar: $nama, $email, Role: $role");
+
+      // Kirim data ke AuthProvider
+      final success = await auth.register(
+        nama: nama,
+        email: email,
+        password: password,
+        confirmedPassword: confirmedPassword,
+        role: role,
       );
+      
+      if (!mounted) return;
+
+      if (success) {
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pendaftaran Berhasil! Silakan Login.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          Navigator.pushReplacementNamed(context, '/login');
+          // Navigator.pushReplacementNamed(context, '/customer_home');
+
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pendaftaran Gagal. Email mungkin sudah terdaftar.')),
+        );
+      }
+    } catch (e) {
+     
+      print("Error saat register: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan sistem.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -82,7 +111,7 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Column(
           children: [
             OrganicHeader(
-              height: 260,
+              height: 320,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: Column(

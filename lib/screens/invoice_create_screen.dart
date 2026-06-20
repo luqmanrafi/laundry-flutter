@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/user.dart';
+import 'package:provider/provider.dart';
+
+import '../models/order.dart';
+import '../models/service.dart';
+import '../providers/order_provider.dart';
 import '../utils/order_flow_controller.dart';
 import '../utils/notification_controller.dart';
 import '../models/app_notification.dart';
@@ -14,38 +18,37 @@ class InvoiceCreateScreen extends StatefulWidget {
 
 class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   final TextEditingController _weightController = TextEditingController();
-  final TextEditingController _rateController = TextEditingController(text: '15000');
   final TextEditingController _noteController = TextEditingController();
   
   double _weight = 0.0;
-  double _ratePerKg = 15000.0;
-  String _selectedService = 'Cuci Kering';
-  
-  final List<String> _services = [
-    'Cuci Ekspres',
-    'Cuci Kering',
-    'Cuci Setrika',
-    'Setrika Saja'
-  ];
 
   @override
   void initState() {
     super.initState();
     _weightController.addListener(_calculateTotal);
-    _rateController.addListener(_calculateTotal);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final order = Provider.of<OrderProvider>(context, listen: false).currentOrder;
+      if (order != null) {
+        setState(() {
+          if (order.weight != null) {
+            _weightController.text = order.weight.toString();
+            _weight = order.weight!;
+          }
+        });
+      }
+    });
   }
   
   void _calculateTotal() {
     setState(() {
       _weight = double.tryParse(_weightController.text) ?? 0.0;
-      _ratePerKg = double.tryParse(_rateController.text) ?? 0.0;
     });
   }
 
   @override
   void dispose() {
     _weightController.dispose();
-    _rateController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -57,7 +60,13 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalPrice = _weight * _ratePerKg;
+    final orderProv = Provider.of<OrderProvider>(context);
+    final order = orderProv.currentOrder;
+    final isLoading = orderProv.isLoading;
+    final ratePerKg = order?.service.pricePerKg.toDouble() ?? 0.0;
+    final subTotal = _weight * ratePerKg;
+    final shippingFee = order?.ongkir ?? 0.0;
+    final totalPrice = subTotal + shippingFee;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F5),
@@ -95,17 +104,17 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                     children: [
                       const Text('Order ID', style: TextStyle(fontSize: 14, color: Colors.black54)),
                       const SizedBox(height: 4),
-                      const Text('#INV-220525-001', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24))),
+                      Text(order != null ? '#ORD-${order.id}' : '#ORD-10', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24))),
                       const SizedBox(height: 12),
                       Row(
-                        children: const [
-                          CircleAvatar(
+                        children: [
+                          const CircleAvatar(
                             radius: 16,
                             backgroundColor: Color(0xFFF4F7F5),
                             child: Icon(Icons.person, color: Colors.grey, size: 20),
                           ),
-                          SizedBox(width: 12),
-                          Text('Fahrudin Tamimi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                          const SizedBox(width: 12),
+                          Text(order?.customer.name ?? 'Fahrudin Tamimi', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                         ],
                       ),
                     ],
@@ -160,55 +169,46 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                 const Divider(color: Color(0xFFE4E6EA), height: 1),
                 _buildInputField(
                   label: 'Tarif per kg',
-                  child: SizedBox(
-                    width: 150,
-                    child: TextField(
-                      controller: _rateController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24)),
-                      decoration: InputDecoration(
-                        prefixText: 'Rp ',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        filled: true,
-                        fillColor: Colors.transparent,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-                      ),
-                    ),
+                  child: Text(
+                    _formatCurrency(ratePerKg),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24)),
                   ),
                 ),
                 const Divider(color: Color(0xFFE4E6EA), height: 1),
                 _buildInputField(
                   label: 'Layanan',
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedService,
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF004A5E)),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24), fontFamily: 'Montserrat'),
-                      alignment: Alignment.centerRight,
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _selectedService = newValue;
-                          });
-                        }
-                      },
-                      items: _services.map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                    ),
+                  child: Text(
+                    order?.service.name ?? 'Layanan',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24)),
+                    textAlign: TextAlign.right,
                   ),
                 ),
                 const Divider(color: Color(0xFFE4E6EA), height: 1),
+                if (_weight > 0) ...[
+                  _buildInputField(
+                    label: 'Subtotal',
+                    child: Text(
+                      _formatCurrency(subTotal),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1C1F24)),
+                    ),
+                  ),
+                  const Divider(color: Color(0xFFE4E6EA), height: 1),
+
+                  _buildInputField(
+                    label: 'Ongkos Kirim',
+                    child: Text(
+                      _formatCurrency(shippingFee),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1C1F24)),
+                    ),
+                  ),
+                  const Divider(color: Color(0xFFE4E6EA), height: 1),
+                ],
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total Harga', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24))),
+                      const Text('Total Harga Akhir', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1C1F24))),
                       Text(
                         _formatCurrency(totalPrice),
                         style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF2DAAC8)),
@@ -249,29 +249,58 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               elevation: 4,
             ),
-            onPressed: _weight > 0 && _ratePerKg > 0 ? () {
-              // Save total price
-              OrderFlowController.currentTotal.value = totalPrice;
-              
-              // Finish pickup, advance order status
-              OrderFlowController.performRoleAction(UserRole.kurir);
-              
-              // Add a notification for the customer
-              NotificationController.addNotification(AppNotification(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                title: 'Tagihan Pembayaran Baru',
-                message: 'Tagihan untuk pesanan #INV-220525-001 sebesar ${_formatCurrency(totalPrice)} telah diterbitkan. Silakan lakukan pembayaran.',
-                timestamp: DateTime.now(),
-                type: NotificationType.orderUpdate,
-              ));
+            onPressed: _weight > 0 && ratePerKg > 0 && !isLoading ? () async {
+                  final notes = _noteController.text.trim();
+                  
+                  final success = await orderProv.updateStatus(
+                    order!.id, 
+                    OrderStatus.dibawa_kurir_ke_laundry,
+                    weight: _weight,
+                    price: ratePerKg,
+                    finalTotalPrice: totalPrice,
+                    notes: notes
+                  );
 
-              Navigator.pushReplacementNamed(context, '/courier_home');
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Invoice berhasil dibuat dengan total ${_formatCurrency(totalPrice)}!')),
-              );
-            } : null, // Disable if no weight or rate inputted
-            child: const Text('Simpan & Kirim Invoice', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              if (success) {
+                // Save total price
+                OrderFlowController.currentTotal.value = totalPrice;
+                
+                // Finish pickup, advance order status in local state too
+                OrderFlowController.status.value = OrderStatus.dibawa_kurir_ke_laundry;
+
+                // Refresh data dari API agar provider sinkron dengan backend
+                await orderProv.refreshCurrentOrder();
+                
+                // Add a notification for the customer
+                NotificationController.addNotification(AppNotification(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  title: 'Tagihan Pembayaran Baru',
+                  message: 'Tagihan untuk pesanan #ORD-${order!.id} sebesar ${_formatCurrency(totalPrice)} telah diterbitkan. Silakan lakukan pembayaran.',
+                  timestamp: DateTime.now(),
+                  type: NotificationType.orderUpdate,
+                ));
+
+                if (mounted) {
+                  Navigator.pushReplacementNamed(context, '/courier_home');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Invoice berhasil dibuat dengan total ${_formatCurrency(totalPrice)}!')),
+                  );
+                }
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Gagal menyimpan invoice ke backend.')),
+                  );
+                }
+              }
+            } : null, // Disable if no weight, rate inputted, or loading
+            child: isLoading 
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text('Simpan & Kirim Invoice', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           ),
         ),
       ),

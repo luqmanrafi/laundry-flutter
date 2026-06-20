@@ -8,11 +8,11 @@ final dummyUsers = [
   User(id: 'u2', name: 'Budi', email: 'budi@mail.com', role: UserRole.kurir, avatarUrl: null),
 ];
 
-final dummyServices = [
-  Service(id: 's1', name: 'Cuci Ekspres', description: 'Selesai 6 jam', pricePerKg: 12000, icon: 'bolt'),
-  Service(id: 's2', name: 'Cuci Kering', description: 'Cuci + Kering', pricePerKg: 9000, icon: 'local_laundry_service'),
-  Service(id: 's3', name: 'Cuci Setrika', description: 'Cuci + Setrika', pricePerKg: 10000, icon: 'iron'),
-  Service(id: 's4', name: 'Setrika Saja', description: 'Setrika saja', pricePerKg: 7000, icon: 'iron'),
+List<Service> dummyServices = [
+  Service(id: 's1', name: 'Cuci Ekspres', description: 'Selesai 6 jam', pricePerKg: 12000),
+  Service(id: 's2', name: 'Cuci Kering', description: 'Cuci + Kering', pricePerKg: 9000),
+  Service(id: 's3', name: 'Cuci Setrika', description: 'Cuci + Setrika', pricePerKg: 10000),
+  Service(id: 's4', name: 'Setrika Saja', description: 'Setrika saja', pricePerKg: 7000),
 ];
 
 final dummyOrders = [
@@ -21,10 +21,11 @@ final dummyOrders = [
     customer: dummyUsers[0],
     courier: dummyUsers[1],
     service: dummyServices[0],
-    pickupDate: DateTime.now().add(Duration(days: 1)),
+    pickupDate: DateTime.now().add(const Duration(days: 1)),
     pickupAddress: 'Jl. Mawar No. 1',
     weight: 3.5,
-    status: OrderStatus.pickup,
+    // KUNCI EMAS: Ubah dari .pickup ke status baru sesuai database Laravel backend
+    status: OrderStatus.dibawa_kurir_ke_laundry, 
     invoice: Invoice(
       id: 'i1',
       orderId: 'o1',
@@ -39,7 +40,7 @@ final dummyOrders = [
     customer: dummyUsers[0],
     courier: dummyUsers[1],
     service: dummyServices[2],
-    pickupDate: DateTime.now().add(Duration(days: 2)),
+    pickupDate: DateTime.now().add(const Duration(days: 2)),
     pickupAddress: 'Jl. Melati No. 2',
     weight: null,
     status: OrderStatus.pending,

@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
-import '../widgets/app_logo.dart';
+import 'package:flutter/material.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+   
     final primaryColor = Theme.of(context).primaryColor;
-    
+
     return Scaffold(
       backgroundColor: primaryColor,
       body: Stack(
         children: [
-          // Background Blobs
+         
           Positioned.fill(
             child: CustomPaint(
               painter: _WelcomeBackgroundPainter(),
@@ -26,8 +27,16 @@ class WelcomeScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const AppLogo(size: 120, color: Colors.white),
-                      const SizedBox(height: 40),
+                     
+                      Image.asset(
+                        'assets/images/LogoPutih.png', 
+                        height: 350,
+                        width: 350,
+                        fit: BoxFit.contain, 
+                      ),
+
+                      
+                      const SizedBox(height: 2),
                       const Text(
                         'Laundry App',
                         style: TextStyle(
@@ -47,21 +56,47 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 60),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2DAAC8), // Vibrant Orange
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                          minimumSize: const Size(200, 56),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
+
+                     
+                      Column(
+                        children: [
+                          // TOMBOL SIGN UP
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2DAAC8), // Warna biru cerah
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(double.infinity, 56), // Lebar penuh
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              elevation: 2,
+                            ),
+                            onPressed: () => Navigator.pushNamed(context, '/signup'),
+                            child: const Text(
+                              'CREATE ACCOUNT',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                            ),
                           ),
-                        ),
-                        onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-                        child: const Text(
-                          'GET STARTED',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                        ),
+                          
+                          const SizedBox(height: 16),
+
+                          // TOMBOL SIGN IN 
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white, width: 1.5), 
+                              minimumSize: const Size(double.infinity, 56),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            onPressed: () => Navigator.pushNamed(context, '/login'),
+                            child: const Text(
+                              'SIGN IN',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -79,7 +114,9 @@ class _WelcomeBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paintLightGreen = Paint()
-      ..color = const Color(0xFF1E7A4E).withAlpha(100) // Slightly lighter green
+      ..color = const Color(0xFFF1F5F9)
+      // ..color = const Color(0xFF1E7A4E).withAlpha(100)// Slightly lighter green
+      
       ..style = PaintingStyle.fill;
 
     // Bottom left blob

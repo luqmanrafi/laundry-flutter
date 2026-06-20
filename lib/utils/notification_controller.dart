@@ -8,9 +8,9 @@ class NotificationController {
     AppNotification(
       id: 'welcome',
       title: 'Selamat datang di WashWeswos!',
-      message: 'Layanan laundry premium terbaik untuk pakaian kesayangan Anda. Nikmati promo perdana 20% khusus hari ini!',
+      message: 'Layanan laundry premium terbaik untuk pakaian kesayangan Anda.',
       timestamp: DateTime.now().subtract(const Duration(days: 1)),
-      type: NotificationType.promo,
+      type: NotificationType.systemInfo,
     ),
     AppNotification(
       id: 'system',

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../models/order.dart';
 import '../utils/order_flow_controller.dart';
 
@@ -7,13 +6,15 @@ class OrderStatusStepper extends StatelessWidget {
   final OrderStatus status;
   const OrderStatusStepper({super.key, required this.status});
 
-  static const List<OrderStatus> _steps = [
+  // Ganti array list status di stepper kamu menjadi seperti ini (Variabel Aktif!)
+  final List<OrderStatus> statuses = const [
     OrderStatus.pending,
-    OrderStatus.pickup,
-    OrderStatus.waitingConfirmation,
-    OrderStatus.processing,
-    OrderStatus.delivery,
-    OrderStatus.completed,
+    OrderStatus.kurir_menuju_lokasi,
+    OrderStatus.dibawa_kurir_ke_laundry,
+    OrderStatus.sedang_dicuci,
+    OrderStatus.siap_dikirim,
+    OrderStatus.proses_pengantaran,
+    OrderStatus.selesai,
   ];
 
   @override
@@ -41,14 +42,15 @@ class OrderStatusStepper extends StatelessWidget {
       );
     }
 
-    final currentIndex = _steps.indexOf(status);
+    // KUNCI EMAS: Ubah pemanggilan _steps menjadi statuses!
+    final currentIndex = statuses.indexOf(status);
 
     return Column(
-      children: List.generate(_steps.length, (index) {
-        final step = _steps[index];
+      children: List.generate(statuses.length, (index) {
+        final step = statuses[index];
         final isDone = index < currentIndex;
         final isActive = index == currentIndex;
-        final isLast = index == _steps.length - 1;
+        final isLast = index == statuses.length - 1;
 
         return InkWell(
           onTap: () {
@@ -86,7 +88,7 @@ class OrderStatusStepper extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 1),
                   child: Text(
-                    step.label,
+                    step.label, // Otomatis memanggil label extension dari model baru
                     style: TextStyle(
                       fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                       color: isDone || isActive ? const Color(0xFF1C1F24) : const Color(0xFF8B94A1),

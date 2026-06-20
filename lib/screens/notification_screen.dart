@@ -66,7 +66,7 @@ class NotificationScreen extends StatelessWidget {
           ),
           SizedBox(height: 8),
           Text(
-            'Semua pemberitahuan pesanan\\nakan muncul di sini.',
+            'Semua pemberitahuan pesanan\nakan muncul di sini.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: Colors.black54),
           ),
@@ -130,14 +130,14 @@ class _NotificationCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isUnread ? Colors.white : const Color(0xFFF9F9F9),
+          color: isUnread ? const Color(0xFFF2FBFC) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: isUnread 
               ? const [BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4))]
-              : null,
+              : const [BoxShadow(color: Color(0x05000000), blurRadius: 4, offset: Offset(0, 2))],
           border: isUnread 
-              ? Border.all(color: const Color(0xFF005B71).withAlpha(30), width: 1.5)
-              : Border.all(color: Colors.transparent),
+              ? Border.all(color: const Color(0xFF005B71).withOpacity(0.2), width: 1)
+              : Border.all(color: Colors.grey.shade100, width: 1),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,9 +162,9 @@ class _NotificationCard extends StatelessWidget {
                         child: Text(
                           notification.title,
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15, // Dikecilkan sedikit agar tidak mudah patah kalimatnya
                             fontWeight: isUnread ? FontWeight.w800 : FontWeight.w600,
-                            color: isUnread ? const Color(0xFF1C1F24) : Colors.black54,
+                            color: isUnread ? const Color(0xFF1C1F24) : Colors.black87,
                           ),
                         ),
                       ),
@@ -172,7 +172,7 @@ class _NotificationCard extends StatelessWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          margin: const EdgeInsets.only(top: 6, left: 8),
+                          margin: const EdgeInsets.only(top: 4, left: 12),
                           decoration: const BoxDecoration(
                             color: Color(0xFF2DAAC8),
                             shape: BoxShape.circle,
