@@ -20,7 +20,7 @@ class OrganicHeader extends StatelessWidget {
             child: CustomPaint(
               painter: _HeaderPainter(
                 primaryColor: const Color(0xFF005B71),
-                darkColor: const Color(0xFF0D3A26),
+                darkColor: const Color(0xFF2DAAC8),
               ),
             ),
           ),

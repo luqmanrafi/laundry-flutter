@@ -87,37 +87,39 @@ class _PaymentGatewaySimulationState extends State<PaymentGatewaySimulation> {
   Widget _buildContent() {
     switch (_state) {
       case PaymentState.selecting:
-        return Column(
+        return SingleChildScrollView(
           key: const ValueKey('selecting'),
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total Pembayaran',
-                  style: TextStyle(fontSize: 16, color: Colors.black54),
-                ),
-                Text(
-                  _formatCurrency(widget.amount),
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF005B71)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Pilih Metode Pembayaran',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 16),
-            _buildPaymentMethod('GoPay', Icons.account_balance_wallet, Colors.blue),
-            const SizedBox(height: 12),
-            _buildPaymentMethod('OVO', Icons.account_balance_wallet_outlined, Colors.purple),
-            const SizedBox(height: 12),
-            _buildPaymentMethod('BCA Virtual Account', Icons.account_balance, Colors.blue.shade800),
-            const SizedBox(height: 12),
-            _buildPaymentMethod('Mandiri Virtual Account', Icons.account_balance, Colors.orange.shade700),
-          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Total Pembayaran',
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
+                  ),
+                  Text(
+                    _formatCurrency(widget.amount),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF005B71)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Pilih Metode Pembayaran',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 16),
+              _buildPaymentMethod('GoPay', Icons.account_balance_wallet, Colors.blue),
+              const SizedBox(height: 12),
+              _buildPaymentMethod('OVO', Icons.account_balance_wallet_outlined, Colors.purple),
+              const SizedBox(height: 12),
+              _buildPaymentMethod('BCA Virtual Account', Icons.account_balance, Colors.blue.shade800),
+              const SizedBox(height: 12),
+              _buildPaymentMethod('Mandiri Virtual Account', Icons.account_balance, Colors.orange.shade700),
+            ],
+          ),
         );
       
       case PaymentState.processing:

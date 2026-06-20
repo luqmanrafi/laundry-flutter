@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'screens/signup_screen.dart';
 import 'screens/login_screen.dart';
@@ -16,6 +17,20 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/order_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+      };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
 
 Future<void> main() async {
   // 1. WAJIB: Inisialisasi binding Flutter untuk proses async
@@ -61,6 +76,7 @@ class WashWeswosApp extends StatelessWidget {
     const accent = Color(0xFF2DAAC8);
 
     return MaterialApp(
+      scrollBehavior: AppScrollBehavior(),
       debugShowCheckedModeBanner: false,
       title: 'WashWeswos Laundry',
       theme: ThemeData(

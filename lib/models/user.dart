@@ -6,6 +6,7 @@ class User {
   final String email;
   final UserRole role;
   final String? avatarUrl;
+  final String? phone;
 
   User({
     required this.id,
@@ -13,6 +14,7 @@ class User {
     required this.email,
     required this.role,
     this.avatarUrl,
+    this.phone,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class User {
       // Jika dari backend tiba-tiba ngirim string 'admin' (buat jaga-jaga), kita default-kan ke pelanggan saja biar gak crash
       role: json['role']?.toString().toLowerCase() == 'kurir' ? UserRole.kurir : UserRole.pelanggan,
       avatarUrl: json['avatarUrl'] ?? json['avatar_url'],
+      phone: json['phone'] ?? json['no_hp'] ?? json['telepon'],
     );
   }
 }

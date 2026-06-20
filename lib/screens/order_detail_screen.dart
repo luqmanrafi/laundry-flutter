@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../models/order.dart';
 import '../models/user.dart';
@@ -6,6 +10,7 @@ import '../providers/order_provider.dart';
 import '../utils/order_flow_controller.dart';
 import '../widgets/order_status_stepper.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/address_text.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String? orderId; // Menampung kiriman ID Order dari halaman list/riwayat
@@ -17,6 +22,7 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
+
  @override
   void initState() {
     super.initState();
@@ -58,14 +64,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     });
   }
 
+  Future<void> _openWhatsApp(String phone) async {
+    String formattedPhone = phone;
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '62${formattedPhone.substring(1)}';
+    }
+
+    final Uri waUrl = Uri.parse('https://wa.me/$formattedPhone');
+    if (await canLaunchUrl(waUrl)) {
+      await launchUrl(waUrl);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tidak dapat membuka WhatsApp')),
+        );
+      }
+    }
+  }
+
   Future<void> _handleCourierAction(Order order) async {
     final orderProv = context.read<OrderProvider>();
     
+    if (order.status == OrderStatus.pending) {
+      final success = await orderProv.takeOrder(order.id);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pesanan berhasil diambil!')),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Maaf, pesanan ini sudah diambil oleh kurir lain.')),
+        );
+        orderProv.loadMyOrders('');
+        Navigator.pop(context); // Kembali ke list utama
+      }
+      return;
+    }
+
     OrderStatus? nextStatus;
     switch (order.status) {
-      case OrderStatus.pending:
-        nextStatus = OrderStatus.dibawa_kurir_ke_laundry;
-        break;
       case OrderStatus.siap_dikirim:
         nextStatus = OrderStatus.proses_pengantaran;
         break;
@@ -146,25 +183,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
+                        flex: 1,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Order ID', style: TextStyle(fontSize: 16, color: Colors.black54)),
+                            const Text('Order ID', style: TextStyle(fontSize: 14, color: Colors.black54)),
                             const SizedBox(height: 4),
-                          
-                            Text('#ORD-${order.id}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1C1F24))),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text('#ORD\u2011${order.id}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1C1F24))),
+                            ),
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2DAAC8).withAlpha(30),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          order.status.label.toUpperCase(), 
-                          style: const TextStyle(color: Color(0xFF2DAAC8), fontWeight: FontWeight.w800, fontSize: 12),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2DAAC8).withAlpha(30),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            order.status.label.toUpperCase(), 
+                            style: const TextStyle(color: Color(0xFF2DAAC8), fontWeight: FontWeight.w800, fontSize: 11),
+                            textAlign: TextAlign.right,
+                          ),
                         ),
                       ),
                     ],
@@ -178,25 +224,102 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       const CircleAvatar(radius: 24, backgroundColor: Color(0xFFF4F7F5), child: Icon(Icons.person, color: Colors.grey)),
                       const SizedBox(width: 14),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(order.customer.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 2),
-                            Text(order.customer.email, style: const TextStyle(fontSize: 14, color: Colors.black54)),
-                          ],
+                        child: Builder(
+                          builder: (context) {
+                            final authProv = Provider.of<AuthProvider>(context, listen: false);
+                            final bool isPelanggan = authProv.currentUser?.role == UserRole.pelanggan;
+                            final String customerName = ((order.customer.name == 'Pelanggan Asli' || order.customer.name == 'Pelanggan Anonim') && authProv.currentUser?.name != null && isPelanggan)
+                                ? authProv.currentUser!.name
+                                : order.customer.name;
+                            final String customerEmail = (order.customer.email == 'pelanggan@laundry.com' && authProv.currentUser?.email != null && isPelanggan)
+                                ? authProv.currentUser!.email
+                                : order.customer.email;
+                            
+                            // Gunakan no HP pelanggan. Jika kosong, buat no dummy berdasarkan panjang nama agar unik
+                            final String displayPhone = order.customer.phone ?? '0812999${order.customer.name.length}000';
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(customerName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.phone, size: 14, color: Color(0xFF005B71)),
+                                    const SizedBox(width: 4),
+                                    Text(displayPhone, style: const TextStyle(fontSize: 14, color: Color(0xFF005B71), fontWeight: FontWeight.bold)),
+                                  ],
+                                )
+                              ],
+                            );
+                          }
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.call, color: Color(0xFF005B71)),
-                        style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFF005B71).withAlpha(20),
-                          padding: const EdgeInsets.all(12),
-                        ),
-                        onPressed: () {},
+                      Builder(
+                        builder: (context) {
+                          final String targetPhone = order.customer.phone ?? '0812999${order.customer.name.length}000';
+                          return IconButton(
+                            icon: const Icon(Icons.chat, color: Color(0xFF25D366)),
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFF25D366).withAlpha(20),
+                              padding: const EdgeInsets.all(12),
+                            ),
+                            onPressed: () => _openWhatsApp(targetPhone),
+                          );
+                        }
                       ),
                     ],
                   ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(color: Color(0xFFE4E6EA)),
+                  ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.location_on_outlined, color: Color(0xFF005B71), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Alamat Penjemputan', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54)),
+                            const SizedBox(height: 4),
+                            AddressText(
+                              address: order.pickupAddress,
+                              style: const TextStyle(fontSize: 14, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (order.jarakMeter != null) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(color: Color(0xFFE4E6EA)),
+                    ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.social_distance_outlined, color: Color(0xFF005B71), size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Jarak ke Pelanggan', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54)),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${(order.jarakMeter! / 1000).toStringAsFixed(1)} km',
+                                style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -224,9 +347,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Rincian Pembayaran',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF005B71)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Rincian Pembayaran',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF005B71)),
+                      ),
+                      Builder(
+                        builder: (context) {
+                          final authProv = Provider.of<AuthProvider>(context, listen: false);
+                          final roleLogin = authProv.currentUser?.role ?? UserRole.pelanggan;
+                          if (roleLogin == UserRole.kurir && order.status == OrderStatus.sedang_dicuci && order.paymentStatus != 'paid') {
+                            return InkWell(
+                              onTap: () {
+                                Navigator.pushNamed(context, '/invoice_create');
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2DAAC8).withAlpha(20),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.edit, size: 14, color: Color(0xFF2DAAC8)),
+                                    SizedBox(width: 4),
+                                    Text('Edit', style: TextStyle(color: Color(0xFF2DAAC8), fontWeight: FontWeight.bold, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox();
+                        }
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   
@@ -235,28 +391,51 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Paket: ${order.service.name}', style: const TextStyle(color: Colors.black87, fontSize: 15)),
-                      Text('Rp ${order.service.pricePerKg}/kg', style: const TextStyle(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // ONGKOS KIRIM REAL DARI KALKULASI BACKEND (Misal Rp 196.713)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text('Ongkos Kirim (Jarak Spasial)', style: TextStyle(color: Colors.black54, fontSize: 14)),
-                      Text('Rp 196.713', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                      Text('${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(order.service.pricePerKg)}/kg', style: const TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                   
-                  // JIKA BERAT SUDAH DI-INPUT KURIR DI OUTLET (INVOICE GENERATED)
-                  if (order.weight != null && order.invoice != null) ...[
+                  // JIKA BERAT SUDAH DI-INPUT KURIR (INVOICE GENERATED)
+                  if (order.weight != null) ...[
                     const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Berat Pakaian (${order.weight} kg)', style: const TextStyle(color: Colors.black54, fontSize: 14)),
-                        Text('Rp ${order.invoice!.totalPrice - 196713}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const Text('Berat Pakaian', style: TextStyle(color: Colors.black54, fontSize: 14)),
+                        Text('${order.weight} kg', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Biaya Laundry', style: TextStyle(color: Colors.black54, fontSize: 14)),
+                        Text(
+                          NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format((order.weight ?? 0) * order.service.pricePerKg),
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('PPN (11%)', style: TextStyle(color: Colors.black54, fontSize: 14)),
+                        Text(
+                          NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(((order.weight ?? 0) * order.service.pricePerKg) * 0.11),
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Ongkos Kirim', style: TextStyle(color: Colors.black54, fontSize: 14)),
+                        Text(
+                          NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(order.ongkir),
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
                       ],
                     ),
                   ],
@@ -277,7 +456,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       Text(
                         order.weight == null 
                             ? 'Menunggu Berat' 
-                            : 'Rp ${order.invoice?.totalPrice ?? "0"}',
+                            : NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(order.invoice?.totalPrice ?? (((order.weight! * order.service.pricePerKg) * 1.11) + order.ongkir).round()),
                         style: TextStyle(
                           fontSize: 18, 
                           fontWeight: FontWeight.w900, 
@@ -290,7 +469,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   if (order.weight == null) ...[
                     const SizedBox(height: 8),
                     Text(
-                      '*Nota final akan diperbarui otomatis oleh sistem setelah kurir menimbang pakaian di outlet laundry.',
+                      '*Nota final akan diperbarui otomatis oleh sistem setelah kurir menimbang pakaian di rumah Pelanggan.',
                       style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey.shade600),
                     ),
                   ],
@@ -308,22 +487,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           child: Builder(
             builder: (context) {
               final authProv = Provider.of<AuthProvider>(context, listen: false);
-            
-              UserRole roleLogin = UserRole.pelanggan;
-              try {
-                final dynamic dynamicAuth = authProv;
-                
-                // Ambil string role dari provider kawanmu
-                final String? roleStr = dynamicAuth.role?.toString() ?? 
-                                       dynamicAuth.userRole?.toString();
-                
-                // Jika terdeteksi kata 'kurir' atau 'courier', ubah role ke kurir
-                if (roleStr != null && (roleStr.toLowerCase().contains('kurir') || roleStr.toLowerCase().contains('courier'))) {
-                  roleLogin = UserRole.kurir;
-                }
-              } catch (_) {
-                roleLogin = UserRole.pelanggan; // Amankan ke pelanggan kalau eror
-              }
+              final UserRole roleLogin = authProv.currentUser?.role ?? UserRole.pelanggan;
 
               final canAct = OrderFlowController.canRoleAct(roleLogin);
               final label = OrderFlowController.actionLabelForRole(roleLogin);
@@ -353,7 +517,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
                 onPressed: canAct
                     ? () {
-                        if (order!.status == OrderStatus.dibawa_kurir_ke_laundry) {
+                        if (order!.status == OrderStatus.kurir_menuju_lokasi) {
                           Navigator.pushReplacementNamed(context, '/invoice_create');
                           return;
                         }

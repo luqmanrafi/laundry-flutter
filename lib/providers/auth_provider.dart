@@ -122,6 +122,70 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
   
+  Future<bool> updateProfile(String name, String email) async {
+    _setLoading(true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = _token ?? prefs.getString('auth_token') ?? '';
+      final userId = _currentUser?.id ?? prefs.getString('user_id') ?? '';
+      
+      // Update memory & shared preferences
+      if (_currentUser != null) {
+        _currentUser = User(
+          id: _currentUser!.id,
+          name: name,
+          email: email,
+          role: _currentUser!.role,
+          avatarUrl: _currentUser!.avatarUrl,
+        );
+      } else {
+        final savedRole = prefs.getString('user_role') ?? 'pelanggan';
+        _currentUser = User(
+          id: userId,
+          name: name,
+          email: email,
+          role: savedRole == 'kurir' ? UserRole.kurir : UserRole.pelanggan,
+        );
+      }
+      
+      await prefs.setString('user_name', name);
+      await prefs.setString('user_email', email);
+      notifyListeners();
+
+      // Call REST API in background (fail-safe)
+      if (dotenv.env['API_URL'] != null && userId.isNotEmpty && token.isNotEmpty) {
+        final baseUrl = dotenv.env['API_URL'];
+        final url = Uri.parse("$baseUrl/users/$userId");
+        print("📡 Mengirim PUT Update Profil ke: $url");
+        
+        try {
+          final response = await http.put(
+            url,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer ${token.trim()}",
+            },
+            body: jsonEncode({
+              "nama": name,
+              "email": email,
+            }),
+          ).timeout(const Duration(seconds: 4));
+
+          print(" RESPONS UPDATE PROFIL [${response.statusCode}]: ${response.body}");
+        } catch (e) {
+          print("⚠️ Koneksi backend update profil gagal/timeout, menggunakan penyimpanan lokal: $e");
+        }
+      }
+      return true;
+    } catch (e) {
+      print("Error updateProfile provider: $e");
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   void logout() async {
     _currentUser = null;
     _token = null;

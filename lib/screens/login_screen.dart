@@ -75,20 +75,23 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           children: [
             OrganicHeader(
-              height: 280,
+              height: 330,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Column(
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-                        onPressed: () => Navigator.pushReplacementNamed(context, '/welcome'),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min, // Fix RenderFlex overflow
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                          onPressed: () => Navigator.pushReplacementNamed(context, '/welcome'),
+                        ),
                       ),
-                    ),
-                    const AppLogo(size: 80, color: Colors.white, showText: true),
-                  ],
+                      const AppLogo(size: 80, color: Colors.white, showText: true),
+                    ],
+                  ),
                 ),
               ),
             ),

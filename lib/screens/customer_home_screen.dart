@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart'; 
 import '../providers/order_provider.dart';
 import '../models/service.dart';
+import '../models/order.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'order_detail_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
@@ -13,24 +16,89 @@ class CustomerHomeScreen extends StatefulWidget {
 }
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+  String _currentAddress = 'Mencari lokasi...';
+  bool _isLoadingLocation = true;
+
   @override
   void initState() {
     super.initState();
+
+    _fetchCurrentLocation();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<OrderProvider>().loadServices();
      
       final auth = context.read<AuthProvider>();
       print("======= DEBUG PRINT AUTH DATA USER =======");
-      print("Isi auth.user: ${(auth as dynamic).user}");
-      try {
-        print("Coba panggil nama langsung: ${(auth as dynamic).name}");
-        print("Coba panggil nama via user: ${(auth as dynamic).user?.name}");
-      } catch(e) {
-        print("Error pas nyoba ngeprint nama: $e");
-      }
+      print("Isi auth.currentUser: ${auth.currentUser?.name}");
       print("==========================================");
     });
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _currentAddress = 'GPS mati';
+          _isLoadingLocation = false;
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _currentAddress = 'Akses ditolak';
+            _isLoadingLocation = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _currentAddress = 'Akses ditolak permanen';
+          _isLoadingLocation = false;
+        });
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        
+        // Deteksi jika ini adalah lokasi default emulator (di luar Indonesia)
+        if (place.isoCountryCode != 'ID' && place.country?.toLowerCase() != 'indonesia') {
+          print("Posisi simulator/perangkat di luar Indonesia. Menggunakan lokasi default.");
+          setState(() {
+            _currentAddress = 'Jl. Veteran No. 190, Lamongan';
+            _isLoadingLocation = false;
+          });
+          return;
+        }
+
+        setState(() {
+          _currentAddress = '${place.street ?? place.name}, ${place.locality ?? place.subAdministrativeArea}';
+          _isLoadingLocation = false;
+        });
+      } else {
+        setState(() {
+          _currentAddress = 'Lokasi tidak ditemukan';
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      print("Error fetching location in Home: $e");
+      setState(() {
+        _currentAddress = 'Gagal memuat lokasi';
+        _isLoadingLocation = false;
+      });
+    }
   }
 
   String getGreeting() {
@@ -39,6 +107,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     if (hour < 15) return 'Selamat Siang';
     if (hour < 18) return 'Selamat Sore';
     return 'Selamat Malam';
+  }
+
+  String _getActiveOrderText(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return 'Mencari kurir terdekat...\nMenunggu konfirmasi kurir.';
+      case OrderStatus.kurir_menuju_lokasi:
+        return 'Kurir menuju lokasi penjemputan\nMohon bersiap.';
+      case OrderStatus.dibawa_kurir_ke_laundry:
+        return 'Kurir membawa pakaian ke laundry\nSedang dalam perjalanan.';
+      case OrderStatus.sedang_dicuci:
+        return 'Pakaian Anda sedang dicuci\nMenunggu proses selesai.';
+      case OrderStatus.siap_dikirim:
+        return 'Pakaian siap dikirim kembali\nMenunggu kurir mengambil pakaian.';
+      case OrderStatus.proses_pengantaran:
+        return 'Kurir sedang mengantar pakaian\nEstimasi tiba 10 menit lagi.';
+      case OrderStatus.selesai:
+        return 'Pesanan telah selesai!\nTerima kasih atas pesanan Anda.';
+      case OrderStatus.cancelled:
+        return 'Pesanan dibatalkan.\nSilakan pesan kembali.';
+      default:
+        return 'Memproses pesanan Anda...';
+    }
   }
 
   @override
@@ -59,28 +150,35 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Color(0xFF005B71),
-                      child: Icon(Icons.person_rounded, color: Colors.white, size: 32),
-                    ),
-                    const SizedBox(width: 15),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          getGreeting(), 
-                          style: const TextStyle(color: Colors.black54, fontSize: 14),
+                GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/profile'),
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: const Color(0xFF005B71),
+                        child: Text(
+                          namaUserLogin.isNotEmpty ? namaUserLogin.substring(0, 1).toUpperCase() : 'U',
+                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                         ),
-                        Text(
-                          namaUserLogin, 
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(width: 15),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            getGreeting(), 
+                            style: const TextStyle(color: Colors.black54, fontSize: 14),
+                          ),
+                          Text(
+                            namaUserLogin, 
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 
                 const SizedBox(height: 25),
@@ -96,20 +194,34 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     ],
                   ),
                   child: Row(
-                    children: const [
-                      Icon(Icons.location_on_outlined, color: Color(0xFF2DAAC8)),
-                      SizedBox(width: 12),
-                      Text('Jl. Raya Basuki Rahmat', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15)),
+                    children: [
+                      const Icon(Icons.location_on_outlined, color: Color(0xFF2DAAC8)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _currentAddress, 
+                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_isLoadingLocation)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2DAAC8)),
+                        ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
 
 
-                Container(
-                  width: double.infinity,
-                  clipBehavior: Clip.antiAlias, 
-                  decoration: BoxDecoration(
+                if (orderProv.currentOrder != null)
+                  Container(
+                    width: double.infinity,
+                    clipBehavior: Clip.antiAlias, 
+                    decoration: BoxDecoration(
                     color: const Color(0xFFE1F5FA),
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -124,8 +236,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             const Text('Pesanan Aktif', 
                               style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF004D61), fontSize: 16)),
                             const SizedBox(height: 6),
-                            const Text('Kurir menuju lokasi Anda\nEstimasi tiba 10 menit lagi', 
-                              style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)),
+                            Text(_getActiveOrderText(orderProv.currentOrder!.status), 
+                              style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)),
                             const SizedBox(height: 12),
                             ElevatedButton(
                               onPressed: () {

@@ -9,6 +9,7 @@ class OrderStatusStepper extends StatelessWidget {
   // Ganti array list status di stepper kamu menjadi seperti ini (Variabel Aktif!)
   final List<OrderStatus> statuses = const [
     OrderStatus.pending,
+    OrderStatus.kurir_menuju_lokasi,
     OrderStatus.dibawa_kurir_ke_laundry,
     OrderStatus.sedang_dicuci,
     OrderStatus.siap_dikirim,

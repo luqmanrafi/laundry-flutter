@@ -43,9 +43,9 @@ class OrderFlowController {
   static bool _performCourierAction() {
     switch (status.value) {
       case OrderStatus.pending:
-        return _move(OrderStatus.dibawa_kurir_ke_laundry);
-      case OrderStatus.dibawa_kurir_ke_laundry:
-        return _move(OrderStatus.sedang_dicuci);
+        return _move(OrderStatus.kurir_menuju_lokasi);
+      // kurir_menuju_lokasi -> dibawa_kurir_ke_laundry is handled by Invoice Screen
+      // dibawa_kurir_ke_laundry -> sedang_dicuci -> siap_dikirim is handled by Admin
       case OrderStatus.siap_dikirim:
         return _move(OrderStatus.proses_pengantaran);
       case OrderStatus.proses_pengantaran:
@@ -77,12 +77,14 @@ class OrderFlowController {
         switch (current) {
           case OrderStatus.pending:
             return 'Ambil Order (Pickup)';
+          case OrderStatus.kurir_menuju_lokasi:
+            return 'Timbang & Buat Tagihan';
           case OrderStatus.dibawa_kurir_ke_laundry:
-            return 'Taruh di Toko & Input Berat';
+            return 'Menunggu Admin Memproses';
           case OrderStatus.sedang_dicuci:
-            return 'Menunggu Proses Cuci Selesai';
+            return 'Pakaian Sedang Dicuci (Admin)';
           case OrderStatus.siap_dikirim:
-            return 'Antar Pakaian Ke Pelanggan';
+            return 'Ambil Baju & Antar ke Pelanggan';
           case OrderStatus.proses_pengantaran:
             return 'Selesaikan Pesanan';
           case OrderStatus.selesai:
@@ -93,10 +95,12 @@ class OrderFlowController {
       case UserRole.pelanggan:
         switch (current) {
           case OrderStatus.pending:
+          case OrderStatus.kurir_menuju_lokasi:
+            return 'Menunggu Kurir';
           case OrderStatus.dibawa_kurir_ke_laundry:
-            return 'Menunggu Invoice Kurir';
-          case OrderStatus.sedang_dicuci:
             return 'Bayar & Konfirmasi Pesanan';
+          case OrderStatus.sedang_dicuci:
+            return 'Pakaian Sedang Dicuci';
           case OrderStatus.siap_dikirim:
             return 'Pesanan Siap Dikirim';
           case OrderStatus.proses_pengantaran:
@@ -118,11 +122,11 @@ class OrderFlowController {
     switch (role) {
       case UserRole.kurir:
         return current == OrderStatus.pending ||
-            current == OrderStatus.dibawa_kurir_ke_laundry ||
+            current == OrderStatus.kurir_menuju_lokasi ||
             current == OrderStatus.siap_dikirim ||
             current == OrderStatus.proses_pengantaran;
       case UserRole.pelanggan:
-        return current == OrderStatus.sedang_dicuci;
+        return current == OrderStatus.dibawa_kurir_ke_laundry || current == OrderStatus.sedang_dicuci;
     }
   }
 }

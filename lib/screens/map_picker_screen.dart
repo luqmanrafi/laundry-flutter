@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart'; 
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class MapPickerScreen extends StatefulWidget {
   const MapPickerScreen({super.key});
@@ -17,11 +20,20 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _isLoadingLocation = true;
   String _addressText = "Sedang mengunci posisi GPS HP..."; 
   final MapController _mapController = MapController();
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
     _determinePosition();
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _determinePosition() async {
@@ -54,19 +66,26 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         desiredAccuracy: LocationAccuracy.high
       );
 
-      // JALAN NINJA: Langsung set koordinat GPS ke State utama
-      setState(() {
-        _selectedLocation = LatLng(position.latitude, position.longitude);
-        _isLoadingLocation = false;
-      });
-
-      // Ambil teks alamatnya
-      _getAddressFromLatLng(position.latitude, position.longitude);
+      if (position.latitude >= -11.0 && position.latitude <= 6.0 &&
+          position.longitude >= 95.0 && position.longitude <= 141.0) {
+        setState(() {
+          _selectedLocation = LatLng(position.latitude, position.longitude);
+          _isLoadingLocation = false;
+        });
+        _getAddressFromLatLng(position.latitude, position.longitude);
+      } else {
+        setState(() {
+          _selectedLocation = const LatLng(-7.1286128, 112.4210956);
+          _isLoadingLocation = false;
+        });
+        _getAddressFromLatLng(-7.1286128, 112.4210956);
+      }
     } catch (e) {
       setState(() {
+        _selectedLocation = const LatLng(-7.1286128, 112.4210956);
         _isLoadingLocation = false;
-        _addressText = "Gagal mengunci GPS. Silakan geser manual.";
       });
+      _getAddressFromLatLng(-7.1286128, 112.4210956);
     }
   }
 
@@ -77,12 +96,68 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         Placemark place = placemarks[0];
         setState(() {
           _addressText = "${place.street}, ${place.subLocality}, ${place.locality}";
+          // Optionally fill search bar with current locality/street
         });
       }
     } catch (e) {
       setState(() {
         _addressText = "Lokasi terkunci. Alamat silakan konfirmasi manual.";
       });
+    }
+  }
+
+  Future<void> _searchAddress(String query) async {
+    if (query.trim().isEmpty) return;
+    
+    // Tampilkan loading di text alamat bawah sementara mencari
+    setState(() {
+      _addressText = "Mencari lokasi '$query'...";
+    });
+
+    try {
+      // Menggunakan OpenStreetMap Nominatim API agar jauh lebih akurat (terutama di iOS/Apple Maps yang sering meleset di Indonesia)
+      final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=1&countrycodes=id');
+      final response = await http.get(url, headers: {'User-Agent': 'LaundryApp/1.0'});
+      
+      if (response.statusCode == 200) {
+        final List data = json.decode(response.body);
+        if (data.isNotEmpty) {
+          final lat = double.parse(data[0]['lat']);
+          final lon = double.parse(data[0]['lon']);
+          final newCenter = LatLng(lat, lon);
+          
+          _mapController.move(newCenter, 16.0);
+          setState(() {
+            _selectedLocation = newCenter;
+          });
+          
+          _getAddressFromLatLng(lat, lon);
+          return;
+        }
+      }
+
+      // Fallback ke geocoding bawaan jika Nominatim gagal
+      List<Location> locations = await locationFromAddress("$query, Indonesia");
+      if (locations.isNotEmpty) {
+        final loc = locations.first;
+        final newCenter = LatLng(loc.latitude, loc.longitude);
+        
+        _mapController.move(newCenter, 16.0);
+        setState(() {
+          _selectedLocation = newCenter;
+        });
+        
+        _getAddressFromLatLng(loc.latitude, loc.longitude);
+      } else {
+        throw Exception("Not found");
+      }
+    } catch (e) {
+      setState(() {
+        _addressText = "Alamat tidak ditemukan. Geser peta manual.";
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Alamat tidak ditemukan, silakan coba nama kota/kabupaten spesifik.')),
+      );
     }
   }
 
@@ -121,6 +196,19 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       final center = camera.center;
                       if (center != null) {
                         _selectedLocation = center;
+                        
+                        // Tampilkan teks loading sementara saat menggeser peta
+                        if (_addressText != "Mencari alamat...") {
+                          setState(() {
+                            _addressText = "Mencari alamat...";
+                          });
+                        }
+
+                        // Debounce pemanggilan API geocoding agar tidak terkena rate limit
+                        _debounceTimer?.cancel();
+                        _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+                          _getAddressFromLatLng(center.latitude, center.longitude);
+                        });
                       }
                     },
                     onMapReady: () {
@@ -134,6 +222,40 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       userAgentPackageName: 'com.example.laundry_flutter',
                     ),
                   ],
+                ),
+                
+                // KOLOM PENCARIAN (SEARCH BAR)
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: _searchAddress,
+                      decoration: InputDecoration(
+                        hintText: 'Ketik nama jalan atau tempat...',
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
+                        prefixIcon: const Icon(Icons.search, color: Color(0xFF005B71)),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.grey),
+                          onPressed: () {
+                            _searchController.clear();
+                          },
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                  ),
                 ),
                 
                 // PIN TENGAH LAYAR

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart'; 
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../providers/order_provider.dart';
 import '../utils/order_flow_controller.dart';
 import '../models/order.dart';
@@ -17,18 +18,20 @@ class CustomerOrderCreateScreen extends StatefulWidget {
 }
 
 class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
-  final _addressController = TextEditingController(text: 'Jl. Melati No. 12, Jakarta');
+  final _addressController = TextEditingController();
   final _notesController = TextEditingController();
   String? _selectedServiceId;
 
   double? _selectedLatitude;
   double? _selectedLongitude;
   bool _isSubmitting = false;
+  bool _isLoadingLocation = false;
 
   @override
   void initState() {
     super.initState();
     _selectedServiceId = widget.initialServiceId;
+    _initGPSLocation();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchDataLayanan();
@@ -48,6 +51,97 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
       });
     } else {
       print(" Ambil data sukses tapi array layanan dari backend KOSONG (0 data).");
+    }
+  }
+
+  Future<void> _initGPSLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+      _addressController.text = "Mengunci koordinat GPS Anda...";
+    });
+
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    try {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _setFallbackLocation("GPS HP nonaktif. Menggunakan lokasi default.");
+        return;
+      }
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _setFallbackLocation("Izin lokasi ditolak. Menggunakan lokasi default.");
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _setFallbackLocation("Izin lokasi ditolak permanen. Menggunakan lokasi default.");
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 5),
+      );
+
+      // Validasi apakah koordinat berada di Indonesia (bounding box Indonesia)
+      if (position.latitude >= -11.0 && position.latitude <= 6.0 &&
+          position.longitude >= 95.0 && position.longitude <= 141.0) {
+        _selectedLatitude = position.latitude;
+        _selectedLongitude = position.longitude;
+        await _getAddressFromLatLng(position.latitude, position.longitude);
+      } else {
+        _setFallbackLocation("Posisi simulator/perangkat di luar Indonesia. Menggunakan lokasi default.");
+      }
+    } catch (e) {
+      print("Error fetching location on load: $e");
+      _setFallbackLocation("Gagal mendeteksi lokasi. Menggunakan lokasi default.");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
+    }
+  }
+
+  void _setFallbackLocation(String reason) {
+    print(reason);
+    _selectedLatitude = -7.1286128;
+    _selectedLongitude = 112.4210956;
+    _getAddressFromLatLng(-7.1286128, 112.4210956);
+  }
+
+  Future<void> _getAddressFromLatLng(double lat, double lng) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        final address = "${place.street ?? ''}, ${place.subLocality ?? ''}, ${place.locality ?? ''}".replaceAll(RegExp(r'^,\s*|,\s*,\s*|,\s*$'), '');
+        if (mounted) {
+          setState(() {
+            _addressController.text = address.isNotEmpty ? address : "Lokasi Terkunci ($lat, $lng)";
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _addressController.text = "Sukodadi, Lamongan, Jawa Timur";
+          });
+        }
+      }
+    } catch (e) {
+      print("Error geocoding fallback: $e");
+      if (mounted) {
+        setState(() {
+          _addressController.text = "Sukodadi, Lamongan, Jawa Timur";
+        });
+      }
     }
   }
 
@@ -97,6 +191,7 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
       final success = await orderProv.createNewOrder(
         serviceId: idLayananReal,
         serviceName: selectedService.name,
+        address: _addressController.text.trim(),
         notes: _notesController.text.trim(),
         latitude: _selectedLatitude!,
         longitude: _selectedLongitude!,
@@ -215,42 +310,17 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
               children: [
                
                 Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(height: 12),
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: const BoxDecoration(color: Color(0xFF005B71), shape: BoxShape.circle),
-                          ),
-                          Container(width: 2, height: 40, color: Colors.grey.shade300),
-                        ],
+                      const Text(
+                        'Alamat Penjemputan',
+                        style: TextStyle(fontSize: 16, color: Color(0xFF005B71), fontWeight: FontWeight.w800),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'White-glove Pickup Location',
-                              style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w600),
-                            ),
-                            TextField(
-                              controller: _addressController,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                              decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () async {
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: _isLoadingLocation ? null : () async {
                           final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const MapPickerScreen()));
                           if (result != null && result is Map<String, dynamic>) {
                             setState(() {
@@ -260,7 +330,46 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
                             });
                           }
                         },
-                        icon: const Icon(Icons.map_outlined, color: Color(0xFF2DAAC8)),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade300),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.02),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.location_on, color: Color(0xFF2DAAC8), size: 24),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _isLoadingLocation 
+                                    ? const Text('Mencari lokasi Anda...', style: TextStyle(color: Colors.grey, fontSize: 15))
+                                    : Text(
+                                        _addressController.text.isEmpty ? 'Tekan untuk pilih dari peta' : _addressController.text,
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87),
+                                      ),
+                              ),
+                              const SizedBox(width: 16),
+                              if (_isLoadingLocation)
+                                const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF2DAAC8)),
+                                )
+                              else
+                                const Icon(Icons.map_rounded, color: Color(0xFF005B71), size: 24),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -440,7 +549,7 @@ class _CustomerOrderCreateScreenState extends State<CustomerOrderCreateScreen> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: _isSubmitting || services.isEmpty ? null : _submitOrder,
+                  onPressed: _isSubmitting || services.isEmpty || _isLoadingLocation ? null : _submitOrder,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF005B71), 
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),

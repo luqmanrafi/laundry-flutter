@@ -111,7 +111,7 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Column(
           children: [
             OrganicHeader(
-              height: 260,
+              height: 320,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: Column(
